@@ -1,7 +1,6 @@
 package syncmap
 
 import (
-	// "fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -10,122 +9,79 @@ import (
 const DefaultDeepNumber int = 4096
 const seed int = 131
 
-// mapStrIter include map itself and sync RWMutex
-type mapStrIter struct {
-	content map[string]interface{}
-	r       *sync.RWMutex
-}
-
-// mapIntIter include map itself and sync RWMutex
-type mapIntIter struct {
-	content map[int]interface{}
+// mapIter include map itself and sync RWMutex
+type mapIter struct {
+	content map[interface{}]interface{}
 	r       *sync.RWMutex
 }
 
 // MapWithLock include map of length and mapIter of slice
 type SyncMap struct {
 	deep  int
-	siter []*mapStrIter
-	iiter []*mapIntIter
+	siter []*mapIter
 }
 
-/*
-* Item style
- */
+// Item style
 type Element struct {
 	key   interface{}
 	value interface{}
 }
 
-/*
-* key style
- */
-type KeyEle struct {
-	keystyle string
-	value    interface{}
-}
-
-/*
-* New object MaoWithLock and initilizte default  length of map and sync map
- */
-
+// New object MaoWithLock and initilizte default  length of map and sync map
 func New() *SyncMap {
 	return newSyncMap(DefaultDeepNumber)
 }
 
-/*
-* New object MaoWithLock and initilizte deep parameter length of map and sync map
- */
+// New object MaoWithLock and initilizte deep parameter length of map and sync map
 func NewSyncMap(deep int) *SyncMap {
 	return newSyncMap(deep)
 }
 
-/*
-* new sync map
- */
+// new sync map
 func newSyncMap(deep int) *SyncMap {
 	sm := &SyncMap{}
 	sm.deep = deep
-	sm.siter = make([]*mapStrIter, sm.deep)
-	sm.iiter = make([]*mapIntIter, sm.deep)
+	sm.siter = make([]*mapIter, sm.deep)
 	for k, _ := range sm.siter {
-		sm.siter[k] = &mapStrIter{}
-		sm.siter[k].content = make(map[string]interface{})
+		sm.siter[k] = &mapIter{}
+		sm.siter[k].content = make(map[interface{}]interface{})
 		sm.siter[k].r = new(sync.RWMutex)
-	}
-	for k, _ := range sm.iiter {
-		sm.iiter[k] = &mapIntIter{}
-		sm.iiter[k].content = make(map[int]interface{})
-		sm.iiter[k].r = new(sync.RWMutex)
 	}
 	return sm
 }
 
-/*
-* set key-value into map
-* int style use remainder algorithm
-* string string use rand algorithm
- */
-
+// set key-value into map
+// int style use remainder algorithm
+// string string use rand algorithm
 func (sm *SyncMap) Set(key interface{}, value interface{}) {
-	// var s interface{}
+	var index int
 	switch key.(type) {
 	case int:
-		s := sm.RemainAddress(key.(int))
-		s.r.Lock()
-		s.content[key.(int)] = value
-		s.r.Unlock()
+		index = sm.RemainAddress(key.(int)) & sm.deep
 	case string:
-		s := sm.HashAddress(key.(string))
-		s.r.Lock()
-		s.content[key.(string)] = value
-		s.r.Unlock()
+		index = sm.HashAddress(key.(string))
 	}
+	sm.siter[index].r.Lock()
+	sm.siter[index].content[key] = value
+	sm.siter[index].r.Unlock()
 }
 
-/*
-* get value from key
- */
-
+// get value from key
 func (sm *SyncMap) Get(key interface{}) (value interface{}, ok bool) {
+	var index int
 	switch key.(type) {
 	case int:
-		s := sm.RemainAddress(key.(int))
-		s.r.RLock()
-		value, ok = s.content[key.(int)]
-		s.r.RUnlock()
+		index = sm.RemainAddress(key.(int)) & sm.deep
 	case string:
-		s := sm.HashAddress(key.(string))
-		s.r.RLock()
-		value, ok = s.content[key.(string)]
-		s.r.RUnlock()
+		index = sm.HashAddress(key.(string))
 	}
+	sm.siter[index].r.RLock()
+	value, ok = sm.siter[index].content[key]
+	sm.siter[index].r.RUnlock()
 	return
 }
 
-/*
-* range all items
- */
+// range all items
 func (sm *SyncMap) RangeItems() <-chan Element {
 	ch := make(chan Element)
 	go func() {
@@ -136,76 +92,46 @@ func (sm *SyncMap) RangeItems() <-chan Element {
 			}
 			siter.r.RUnlock()
 		}
-		for _, iiter := range sm.iiter {
-			iiter.r.RLock()
-			for k, v := range iiter.content {
-				ch <- Element{key: k, value: v}
-			}
-			iiter.r.RUnlock()
-		}
 		close(ch)
 	}()
 	return ch
 }
 
-/*
-* range all key
- */
-func (sm *SyncMap) Rangekeys() <-chan KeyEle {
-	ch := make(chan KeyEle)
-	go func() {
-		for _, siter := range sm.siter {
-			siter.r.RLock()
-			for k, _ := range siter.content {
-				ch <- KeyEle{value: k, keystyle: "string"}
-			}
-			siter.r.RUnlock()
-		}
-		for _, iiter := range sm.iiter {
-			iiter.r.RLock()
-			for k, _ := range iiter.content {
-				ch <- KeyEle{value: k, keystyle: "int"}
-			}
-			iiter.r.RUnlock()
-		}
-		close(ch)
-	}()
-	return ch
-}
-
-/*
-* delete key - value
- */
+//  delete key - value
 func (sm *SyncMap) Delete(key interface{}) {
+	var index int
 	switch key.(type) {
 	case int:
-		s := sm.RemainAddress(key.(int))
-		s.r.Lock()
-		delete(s.content, key.(int))
-		s.r.Unlock()
+		index = sm.RemainAddress(key.(int)) & sm.deep
 	case string:
-		s := sm.HashAddress(key.(string))
-		s.r.Lock()
-		delete(s.content, key.(string))
-		s.r.Unlock()
+		index = sm.HashAddress(key.(string))
 	}
+	sm.siter[index].r.Lock()
+	delete(sm.siter[index].content, key)
+	sm.siter[index].r.Unlock()
 }
 
-/*
-* remainder location
- */
+// size map
+func (sm *SyncMap) Size() int {
+	sumDeep := 0
+	for _, siter := range sm.siter {
+		siter.r.RLock()
+		sumDeep += len(siter.content)
+		siter.r.RUnlock()
+	}
+	return sumDeep
+}
 
-func (sm *SyncMap) RemainAddress(l int) *mapIntIter {
-	return sm.iiter[remainder(sm.deep, l)&sm.deep]
+// remainder location
+func (sm *SyncMap) RemainAddress(l int) int {
+	return remainder(sm.deep, l)
 }
 
 func remainder(numberator int, denominator int) int {
 	return denominator & (numberator - 1)
 }
 
-/*
-* strign hash to int
- */
+// strign hash to int
 func strIntHash(key string) int {
 	var h int
 	for _, c := range key {
@@ -214,13 +140,16 @@ func strIntHash(key string) int {
 	return h
 }
 
-/*
-* find a location with the given key
- */
-func (sm *SyncMap) HashAddress(key string) *mapStrIter {
-	return sm.siter[strIntHash(key)&sm.deep]
+// find a location with the given key
+func (sm *SyncMap) HashAddress(key string) int {
+	var h int
+	for _, c := range key {
+		h = h*seed + int(c)
+	}
+	return h & sm.deep
 }
 
+// init function
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }
