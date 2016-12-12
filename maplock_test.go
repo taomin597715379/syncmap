@@ -9,7 +9,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	var deep int = 1024
+	deep := 1024
 	if s1 := New(); s1 == nil {
 		t.Error("New() is nil")
 	}
@@ -91,10 +91,10 @@ func GetRandomString(l int64) string {
 	return buffer.String()
 }
 
+// 10个 goroutine 打数据
 func BenchmarkSyncMapIntKey(b *testing.B) {
 	s := New()
 	var wg sync.WaitGroup
-	// 10个 goroutine 打数据
 	for j := 0; j < 10; j++ {
 		wg.Add(1)
 		go func() {
@@ -107,10 +107,10 @@ func BenchmarkSyncMapIntKey(b *testing.B) {
 	wg.Wait()
 }
 
+// 10个 goroutine 打数据
 func BenchmarkSyncMapStringKey(b *testing.B) {
 	s := New()
 	var wg sync.WaitGroup
-	// 10个 goroutine 打数据
 	for j := 0; j < 10; j++ {
 		wg.Add(1)
 		go func() {

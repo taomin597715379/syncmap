@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// DefaultDeepNumber default
+// seed  default
 const DefaultDeepNumber int = 4096
 const seed int = 131
 
@@ -15,13 +17,13 @@ type mapIter struct {
 	r       *sync.RWMutex
 }
 
-// MapWithLock include map of length and mapIter of slice
+// SyncMap include map of length and mapIter of slice
 type SyncMap struct {
 	deep  int
 	siter []*mapIter
 }
 
-// Item style
+// Element include key and value
 type Element struct {
 	key   interface{}
 	value interface{}
@@ -32,17 +34,17 @@ func New() *SyncMap {
 	return newSyncMap(DefaultDeepNumber)
 }
 
-// New object MaoWithLock and initilizte deep parameter length of map and sync map
+// NewSyncMap object MaoWithLock and initilizte deep parameter length of map and sync map
 func NewSyncMap(deep int) *SyncMap {
 	return newSyncMap(deep)
 }
 
-// new sync map
+// newSyncMap
 func newSyncMap(deep int) *SyncMap {
 	sm := &SyncMap{}
 	sm.deep = deep
 	sm.siter = make([]*mapIter, sm.deep)
-	for k, _ := range sm.siter {
+	for k := range sm.siter {
 		sm.siter[k] = &mapIter{}
 		sm.siter[k].content = make(map[interface{}]interface{})
 		sm.siter[k].r = new(sync.RWMutex)
@@ -50,7 +52,7 @@ func newSyncMap(deep int) *SyncMap {
 	return sm
 }
 
-// set key-value into map
+// Set key-value into map
 // int style use remainder algorithm
 // string string use rand algorithm
 func (sm *SyncMap) Set(key interface{}, value interface{}) {
@@ -66,7 +68,7 @@ func (sm *SyncMap) Set(key interface{}, value interface{}) {
 	sm.siter[index].r.Unlock()
 }
 
-// get value from key
+// Get value from key
 func (sm *SyncMap) Get(key interface{}) (value interface{}, ok bool) {
 	var index int
 	switch key.(type) {
@@ -81,7 +83,7 @@ func (sm *SyncMap) Get(key interface{}) (value interface{}, ok bool) {
 	return
 }
 
-// range all items
+// RangeItems range all items
 func (sm *SyncMap) RangeItems() <-chan Element {
 	ch := make(chan Element)
 	go func() {
@@ -97,7 +99,7 @@ func (sm *SyncMap) RangeItems() <-chan Element {
 	return ch
 }
 
-//  delete key - value
+// Delete one iter
 func (sm *SyncMap) Delete(key interface{}) {
 	var index int
 	switch key.(type) {
@@ -111,7 +113,7 @@ func (sm *SyncMap) Delete(key interface{}) {
 	sm.siter[index].r.Unlock()
 }
 
-// size map
+// Size map
 func (sm *SyncMap) Size() int {
 	sumDeep := 0
 	for _, siter := range sm.siter {
@@ -122,7 +124,7 @@ func (sm *SyncMap) Size() int {
 	return sumDeep
 }
 
-// remainder location
+// RemainAddress location
 func (sm *SyncMap) RemainAddress(l int) int {
 	return remainder(sm.deep, l)
 }
@@ -131,7 +133,7 @@ func remainder(numberator int, denominator int) int {
 	return denominator & (numberator - 1)
 }
 
-// strign hash to int
+// strIntHash hash to int
 func strIntHash(key string) int {
 	var h int
 	for _, c := range key {
@@ -140,7 +142,7 @@ func strIntHash(key string) int {
 	return h
 }
 
-// find a location with the given key
+// HashAddress find a location with the given key
 func (sm *SyncMap) HashAddress(key string) int {
 	var h int
 	for _, c := range key {
